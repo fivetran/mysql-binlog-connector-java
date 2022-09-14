@@ -933,6 +933,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         abortRequest = false;
         ByteArrayInputStream inputStream = channel.getInputStream();
         boolean completeShutdown = false;
+        abortRequest = false;
         try {
             while (!abortRequest && inputStream.peek() != -1) {
                 int packetLength = inputStream.readInteger(3);
