@@ -110,7 +110,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
     private SocketFactory socketFactory;
     private SSLSocketFactory sslSocketFactory;
 
-    private volatile PacketChannel channel;
+    private volatile PacketChannelShyiko channel;
     private volatile boolean connected;
 
     private ThreadFactory threadFactory;
@@ -463,7 +463,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         CountDownLatch latch = new CountDownLatch(1);
         boolean connected = false;
         try {
-            PacketChannel localChannel;
+            PacketChannelShyiko localChannel;
             connectLock.lock();
             try {
                 if (connectLatch != null) {
@@ -502,8 +502,8 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         }
     }
 
-    private PacketChannel openChannelToBinaryLogStream(final long connectTimeout) throws IOException {
-        PacketChannel channel = null;
+    private PacketChannelShyiko openChannelToBinaryLogStream(final long connectTimeout) throws IOException {
+        PacketChannelShyiko channel = null;
         Callable<Void> cancelCloseChannel = null;
         try {
             try {
@@ -586,13 +586,13 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         }
     }
 
-    private PacketChannel openChannel(final long connectTimeout) throws IOException {
+    private PacketChannelShyiko openChannel(final long connectTimeout) throws IOException {
         Socket socket = socketFactory != null ? socketFactory.createSocket() : new Socket();
         socket.connect(new InetSocketAddress(hostname, port), (int) connectTimeout);
-        return new PacketChannel(socket);
+        return new PacketChannelShyiko(socket);
     }
 
-    private Callable<Void> scheduleCloseChannel(final PacketChannel channel, final long timeout) {
+    private Callable<Void> scheduleCloseChannel(final PacketChannelShyiko channel, final long timeout) {
         final CountDownLatch connectLatch = new CountDownLatch(1);
         final Thread thread = newNamedThread(new Runnable() {
             @Override
@@ -630,7 +630,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         };
     }
 
-    private GreetingPacket receiveGreeting(final PacketChannel channel) throws IOException {
+    private GreetingPacket receiveGreeting(final PacketChannelShyiko channel) throws IOException {
         byte[] initialHandshakePacket = channel.read();
         if (initialHandshakePacket[0] == (byte) 0xFF /* error */) {
             byte[] bytes = Arrays.copyOfRange(initialHandshakePacket, 1, initialHandshakePacket.length);
@@ -641,7 +641,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         return new GreetingPacket(initialHandshakePacket);
     }
 
-    private void enableHeartbeat(final PacketChannel channel) throws IOException {
+    private void enableHeartbeat(final PacketChannelShyiko channel) throws IOException {
         channel.write(new QueryCommand("set @master_heartbeat_period=" + heartbeatInterval * 1000000));
         byte[] statementResult = channel.read();
         if (statementResult[0] == (byte) 0xFF /* error */) {
@@ -652,7 +652,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         }
     }
 
-    private void requestBinaryLogStream(final PacketChannel channel) throws IOException {
+    private void requestBinaryLogStream(final PacketChannelShyiko channel) throws IOException {
         long serverId = blocking ? this.serverId : 0; // http://bugs.mysql.com/bug.php?id=71178
         Command dumpBinaryLogCommand;
         synchronized (gtidSetAccessLock) {
@@ -685,7 +685,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         }
     }
 
-    private void authenticate(final PacketChannel channel, GreetingPacket greetingPacket) throws IOException {
+    private void authenticate(final PacketChannelShyiko channel, GreetingPacket greetingPacket) throws IOException {
         int collation = greetingPacket.getServerCollation();
         int packetNumber = 1;
 
@@ -729,7 +729,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         }
     }
 
-    private void switchAuthentication(final PacketChannel channel, byte[] authenticationResult, boolean usingSSLSocket)
+    private void switchAuthentication(final PacketChannelShyiko channel, byte[] authenticationResult, boolean usingSSLSocket)
             throws IOException {
         /*
             Azure-MySQL likes to tell us to switch authentication methods, even though
@@ -888,7 +888,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         return connectLatch != null;
     }
 
-    private String fetchGtidPurged(final PacketChannel channel) throws IOException {
+    private String fetchGtidPurged(final PacketChannelShyiko channel) throws IOException {
         channel.write(new QueryCommand("show global variables like 'gtid_purged'"));
         ResultSetRowPacket[] resultSet = readResultSet(channel);
         if (resultSet.length != 0) {
@@ -897,7 +897,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         return "";
     }
 
-    private void fetchBinlogFilenameAndPosition(final PacketChannel channel) throws IOException {
+    private void fetchBinlogFilenameAndPosition(final PacketChannelShyiko channel) throws IOException {
         channel.write(new QueryCommand("show master status"));
         ResultSetRowPacket[] resultSet = readResultSet(channel);
         if (resultSet.length == 0) {
@@ -908,7 +908,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         binlogPosition = Long.parseLong(resultSetRow.getValue(1));
     }
 
-    protected ChecksumType fetchBinlogChecksum(final PacketChannel channel) throws IOException {
+    protected ChecksumType fetchBinlogChecksum(final PacketChannelShyiko channel) throws IOException {
         channel.write(new QueryCommand("show variables like 'binlog_checksum'"));
         ResultSetRowPacket[] resultSet = readResultSet(channel);
         if (resultSet.length == 0) {
@@ -917,7 +917,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         return ChecksumType.valueOf(resultSet[0].getValue(1).toUpperCase());
     }
 
-    private void confirmSupportOfChecksum(final PacketChannel channel, ChecksumType checksumType) throws IOException {
+    private void confirmSupportOfChecksum(final PacketChannelShyiko channel, ChecksumType checksumType) throws IOException {
         channel.write(new QueryCommand("set @master_binlog_checksum= @@global.binlog_checksum"));
         byte[] statementResult = channel.read();
         if (statementResult[0] == (byte) 0xFF /* error */) {
@@ -929,7 +929,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         eventDeserializer.setChecksumType(checksumType);
     }
 
-    protected void listenForEventPackets(final PacketChannel channel) throws IOException {
+    protected void listenForEventPackets(final PacketChannelShyiko channel) throws IOException {
         abortRequest = false;
         ByteArrayInputStream inputStream = channel.getInputStream();
         boolean completeShutdown = false;
@@ -1070,7 +1070,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         }
     }
 
-    protected ResultSetRowPacket[] readResultSet(final PacketChannel channel) throws IOException {
+    protected ResultSetRowPacket[] readResultSet(final PacketChannelShyiko channel) throws IOException {
         List<ResultSetRowPacket> resultSet = new LinkedList<ResultSetRowPacket>();
         byte[] statementResult = channel.read();
         if (statementResult[0] == (byte) 0xFF /* error */) {
@@ -1174,7 +1174,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
     public void disconnect() throws IOException {
         connectLock.lock();
         ExecutorService keepAliveThreadExecutor = this.keepAliveThreadExecutor;
-        PacketChannel channel = this.channel;
+        PacketChannelShyiko channel = this.channel;
         CountDownLatch connectLatch = this.connectLatch;
         connectLock.unlock();
 
@@ -1207,7 +1207,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
 
     private void terminateConnect() throws IOException {
         connectLock.lock();
-        PacketChannel channel = this.channel;
+        PacketChannelShyiko channel = this.channel;
         CountDownLatch connectLatch = this.connectLatch;
         connectLock.unlock();
 
@@ -1231,7 +1231,7 @@ public class BinaryLogClientShyiko implements BinaryLogClientMXBean {
         }
     }
 
-    private void closeChannel(final PacketChannel channel) throws IOException {
+    private void closeChannel(final PacketChannelShyiko channel) throws IOException {
         connected = false;
         if (channel != null && channel.isOpen()) {
             channel.close();

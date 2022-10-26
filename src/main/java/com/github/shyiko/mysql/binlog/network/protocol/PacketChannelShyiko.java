@@ -31,17 +31,17 @@ import java.nio.channels.Channel;
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
-public class PacketChannel implements Channel {
+public class PacketChannelShyiko implements Channel {
 
     private Socket socket;
     private ByteArrayInputStream inputStream;
     private ByteArrayOutputStream outputStream;
 
-    public PacketChannel(String hostname, int port) throws IOException {
+    public PacketChannelShyiko(String hostname, int port) throws IOException {
         this(new Socket(hostname, port));
     }
 
-    public PacketChannel(Socket socket) throws IOException {
+    public PacketChannelShyiko(Socket socket) throws IOException {
         this.socket = socket;
         this.inputStream = new ByteArrayInputStream(new BufferedSocketInputStream(socket.getInputStream()));
         this.outputStream = new ByteArrayOutputStream(socket.getOutputStream());
